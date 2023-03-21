@@ -1,3 +1,4 @@
+import json
 import sys
 import copy
 import grpc
@@ -7,14 +8,11 @@ import GET_MAP_pb2
 import GET_MAP_pb2_grpc
 import ast
 import os
+import pika
 from hashlib import sha256
 
 import GET_SERIAL_pb2
 import GET_SERIAL_pb2_grpc
-import POST_PIN_pb2
-import POST_PIN_pb2_grpc
-import POST_STATUS_pb2
-import POST_STATUS_pb2_grpc
 
 
 # function that sends a request to grpc server to get map
@@ -60,16 +58,6 @@ def get_serial_no():
         return response.serial_no
 
 
-# function to send rover status to server
-def send_rover_status(message, status):
-    # establish channel and stub
-    with grpc.insecure_channel('localhost:50051') as channel:
-        stub = POST_STATUS_pb2_grpc.RoverStatusStub(channel)
-        # send status
-        response = stub.SendStatus(POST_STATUS_pb2.MessageStatus(message=str(message), status=int(status)))
-        return response.ack
-
-
 def disarm_mine(serial_no):
     print(f'Received serial number from server: {serial_no}')
 
@@ -87,8 +75,18 @@ def disarm_mine(serial_no):
     return pin
 
 
+def start_rabbitmq_channel():
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
+    channel = connection.channel()
+    channel.queue_declare(queue='demine-queue')
+
+    return channel, connection
+
+
 # run rover commands
 def rover_execute_command(path_i, rover_moves, row, col, rover_num):
+
+    channel, connection = start_rabbitmq_channel()
 
     # copy map to list -- this is so we don't have to write to map.txt directly
     rover_map = copy.deepcopy(path_i)
@@ -111,11 +109,17 @@ def rover_execute_command(path_i, rover_moves, row, col, rover_num):
 
         # if rover finds a mine, request serial number and send to demine queue
         if int(rover_map[x][y]) > 0:
+            # get mine location and update map
             rover_map[x][y] = '0'
 
             # get serial mine number from server then disarm mine
+            print("Requesting serial_no from server...")
             serial_no = get_serial_no()
-
+            print(f"Received serial_no:{serial_no}")
+            mine_data = {'x': x, 'y': y, 'serial_no': serial_no}
+            print(f"Sending data over to queue", mine_data)
+            # add serial number and location to demine queue
+            channel.basic_publish(exchange='', routing_key='demine-queue', body=json.dumps(mine_data))
         match move:
             case 'M':  # move forward
                 match rover_pos['dir']:
@@ -163,6 +167,7 @@ def rover_execute_command(path_i, rover_moves, row, col, rover_num):
     # if successful, send status to server
     message = f'Rover {rover_num} finished exploring the map'
     print(message)
+    connection.close()
     return
 
 
