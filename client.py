@@ -9,8 +9,6 @@ import GET_MAP_pb2_grpc
 import ast
 import os
 import pika
-from hashlib import sha256
-
 import GET_SERIAL_pb2
 import GET_SERIAL_pb2_grpc
 
@@ -57,24 +55,6 @@ def get_serial_no():
         response = stub.GetSerial(GET_SERIAL_pb2.PlaceHolder(place_holder=None))
         return response.serial_no
 
-
-def disarm_mine(serial_no):
-    print(f'Received serial number from server: {serial_no}')
-
-    # note: we increment pin instead of using random to make sure results are reproducible
-    # i.e. same time pin is found vs. random time generating random pins
-    pin = 0
-    success_code = '0' * 4
-    mine_key = str(pin) + serial_no
-    print('Starting to disarm...')
-    while not (hash_ := sha256(f'{mine_key}'.encode()).hexdigest()).startswith(success_code):
-        pin += 1
-        mine_key = str(pin) + serial_no
-
-    print(f'Found pin: {pin}; Temporary mine key: {hash_}')
-    return pin
-
-
 def start_rabbitmq_channel():
     connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
     channel = connection.channel()
@@ -112,10 +92,12 @@ def rover_execute_command(path_i, rover_moves, row, col, rover_num):
             # get mine location and update map
             rover_map[x][y] = '0'
 
-            # get serial mine number from server then disarm mine
+            # get serial mine number from server
             print("Requesting serial_no from server...")
             serial_no = get_serial_no()
             print(f"Received serial_no:{serial_no}")
+
+            # publish mine data to queue
             mine_data = {'x': x, 'y': y, 'serial_no': serial_no}
             print(f"Sending data over to queue", mine_data)
             # add serial number and location to demine queue
