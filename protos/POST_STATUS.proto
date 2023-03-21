@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+//define PIN service
+service RoverStatus {
+  rpc SendStatus (MessageStatus) returns (AcknowledgementStatus) {}
+}
+
+//define message status  message
+message MessageStatus {
+  string message = 1;
+  int32  status = 2;
+}
+
+//response message containing the map features
+message AcknowledgementStatus {
+  string ack = 1;
+}

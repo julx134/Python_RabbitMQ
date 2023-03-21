@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+//define rover command service
+service RoverCommands {
+  rpc GetRoverMoves (RoverNum) returns (Commands) {}
+}
+
+//define rover number message
+message RoverNum {
+  string rover_name = 1;
+}
+
+//define commands message
+message Commands {
+  string commands = 1;
+}

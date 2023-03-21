@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+//define serial service
+service Serial {
+  rpc GetSerial (PlaceHolder) returns (SerialNumber) {}
+}
+
+//define placeholder message
+message PlaceHolder {
+  string place_holder = 1;
+}
+
+//response message containing the serial number generated
+message SerialNumber {
+  string serial_no = 1;
+}

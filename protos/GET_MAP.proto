@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+//define map service
+service Map {
+  rpc GetMap (MapRequest) returns (MapResponse) {}
+}
+
+//define map request message
+message MapRequest {
+  string name = 1;
+}
+
+//response message containing the map features
+message MapResponse {
+  int32 col = 1;
+  int32 row = 2;
+  string map = 3;
+}

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+//define PIN service
+service PIN {
+  rpc SendPin (Pin) returns (Acknowledgement) {}
+}
+
+//define pin request message
+message Pin {
+  string pin = 1;
+}
+
+//acknowledgement response message
+message Acknowledgement {
+  string ack = 1;
+}
