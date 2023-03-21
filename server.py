@@ -10,10 +10,6 @@ import uuid
 
 import GET_SERIAL_pb2
 import GET_SERIAL_pb2_grpc
-import POST_PIN_pb2
-import POST_PIN_pb2_grpc
-import POST_STATUS_pb2
-import POST_STATUS_pb2_grpc
 
 # global url variable for API endpoint
 urlBase = "https://coe892.reev.dev/lab1/rover/"
@@ -76,36 +72,12 @@ class SerialMine(GET_SERIAL_pb2_grpc.SerialServicer):
         return GET_SERIAL_pb2.SerialNumber(serial_no=str(serial_no))
 
 
-class ReceivePin(POST_PIN_pb2_grpc.PINServicer):
-    # override SendPin proto method
-    def SendPin(self, request, context):
-        # generate random id based on rover name and num move
-        print(f'Received pin: {request.pin}')
-        ack = f'Server acknowledges pin: {request.pin}'
-        return POST_PIN_pb2.Acknowledgement(ack=ack)
-
-
-class ReceiveRoverStatus(POST_STATUS_pb2_grpc.RoverStatusServicer):
-    # override SendStatus proto method
-    def SendStatus(self, request, context):
-        # process status of rover and send acknowledgement messages accordingly
-        status = request.status
-        print(request.message)
-
-        if status:
-            ack = f'Congratulations on making it home safe!'
-        else:
-            ack = f'Try again next time!'
-
-        return POST_STATUS_pb2.AcknowledgementStatus(ack=ack)
 def start_server():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     server.add_insecure_port('[::]:50051')
     GET_MAP_pb2_grpc.add_MapServicer_to_server(Map(), server)
     GET_COMMANDS_pb2_grpc.add_RoverCommandsServicer_to_server(RoverCommands(), server)
     GET_SERIAL_pb2_grpc.add_SerialServicer_to_server(SerialMine(), server)
-    POST_PIN_pb2_grpc.add_PINServicer_to_server(ReceivePin(), server)
-    POST_STATUS_pb2_grpc.add_RoverStatusServicer_to_server(ReceiveRoverStatus(), server)
     server.start()
     print('Started Server...')
     server.wait_for_termination()

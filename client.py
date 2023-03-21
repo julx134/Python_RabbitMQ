@@ -60,16 +60,6 @@ def get_serial_no():
         return response.serial_no
 
 
-# function to send pin to server and wait for acknowledgement
-def send_pin(pin):
-    # establish channel and stub
-    with grpc.insecure_channel('localhost:50051') as channel:
-        stub = POST_PIN_pb2_grpc.PINStub(channel)
-        # send request
-        response = stub.SendPin(POST_PIN_pb2.Pin(pin=str(pin)))
-        return response.ack
-
-
 # function to send rover status to server
 def send_rover_status(message, status):
     # establish channel and stub
@@ -119,13 +109,12 @@ def rover_execute_command(path_i, rover_moves, row, col, rover_num):
     # for loop and match-case statements that handle rover movement
     for move in rover_moves:
 
-        # rover dies immediately if it steps on a mine and does not immediately dig
-        # send notification to server
-        if int(rover_map[x][y]) > 0 and move != 'D':
-            message = f'Rover {rover_num} stepped on a mine and died'
-            ack = send_rover_status(message, 0)
-            print(ack)
-            return write_path_file(rover_num, path)
+        # if rover finds a mine, request serial number and send to demine queue
+        if int(rover_map[x][y]) > 0:
+            rover_map[x][y] = '0'
+
+            # get serial mine number from server then disarm mine
+            serial_no = get_serial_no()
 
         match move:
             case 'M':  # move forward
@@ -162,19 +151,6 @@ def rover_execute_command(path_i, rover_moves, row, col, rover_num):
                         rover_pos['dir'] = 'N'
                     case 'E':
                         rover_pos['dir'] = 'S'
-            case 'D':
-                # if rover digs a mine, remove from map
-                if int(rover_map[x][y]) > 0:
-                    rover_map[x][y] = '0'
-
-                    # get serial mine number from server then disarm mine
-                    serial_no = get_serial_no()
-
-                    # disarm mine
-                    pin = disarm_mine(serial_no)
-
-                    # then share the pin to server
-                    print(send_pin(pin))
 
         x = rover_pos['x']
         y = rover_pos['y']
@@ -185,9 +161,8 @@ def rover_execute_command(path_i, rover_moves, row, col, rover_num):
     write_path_file(rover_num, path)
 
     # if successful, send status to server
-    message = f'Rover {rover_num} returned home a hero!'
-    ack = send_rover_status(message, int(1))
-    print(ack)
+    message = f'Rover {rover_num} finished exploring the map'
+    print(message)
     return
 
 
