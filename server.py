@@ -7,9 +7,10 @@ import GET_MAP_pb2
 from urllib.request import urlopen
 import json
 import uuid
-
+import threading
 import GET_SERIAL_pb2
 import GET_SERIAL_pb2_grpc
+import pika
 
 # global url variable for API endpoint
 urlBase = "https://coe892.reev.dev/lab1/rover/"
@@ -71,8 +72,27 @@ class SerialMine(GET_SERIAL_pb2_grpc.SerialServicer):
         print(f'Generated serial {serial_no}')
         return GET_SERIAL_pb2.SerialNumber(serial_no=str(serial_no))
 
+def get_defused_mines():
+    # establish connection and consume data from defused-mines channel
+    new_connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
+    new_channel = new_connection.channel()
+    new_channel.queue_declare(queue='defused-mines')
+
+    def print_mine(ch, method, properties, body):
+        mine_data = json.loads(body)
+        print(f'Received message from difused-mines channel with the following mine data:\n{mine_data}')
+
+    new_channel.basic_consume(queue='defused-mines', on_message_callback=print_mine, auto_ack=True)
+    new_channel.start_consuming()
 
 def start_server():
+
+    # set thread worker for defused-mines channel
+    thread = threading.Thread(target=get_defused_mines, args=())
+    thread.daemon = True
+    thread.start()
+
+    # set grpc workers
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     server.add_insecure_port('[::]:50051')
     GET_MAP_pb2_grpc.add_MapServicer_to_server(Map(), server)
